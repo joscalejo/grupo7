@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ford-Fulkerson (Edmonds-Karp): Flujo Máximo</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --light: #ecf0f1; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f6fa; margin: 0; padding: 20px; color: var(--primary); display: flex; flex-direction: column; height: 95vh; }
+        h1 { text-align: center; margin-bottom: 10px; }
+        .panel { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        .hidden { display: none; }
+        .control-group { margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        label { font-weight: 600; margin-right: 5px; }
+        input[type="number"], select { padding: 10px; border: 2px solid var(--light); border-radius: 4px; width: 100px; }
+        textarea { width: 100%; height: 80px; padding: 8px; border: 2px solid var(--light); border-radius: 4px; font-family: monospace; resize: vertical; }
+        button { padding: 10px 18px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: white; transition: 0.2s; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-blue { background: var(--secondary); } .btn-blue:hover { background: #2980b9; }
+        .btn-green { background: var(--success); } .btn-green:hover { background: #219a52; }
+        .btn-orange { background: var(--warning); } .btn-orange:hover { background: #d68910; }
+        .btn-gray { background: #95a5a6; } .btn-gray:hover { background: #7f8c8d; }
+        #main-container { display: flex; flex: 1; gap: 20px; min-height: 400px; }
+        #network-view { flex: 3; border-radius: 8px; border: 2px solid var(--light); background: white; }
+        #log-view { flex: 1; display: flex; flex-direction: column; background: white; border-radius: 8px; border: 2px solid var(--light); padding: 15px; overflow-y: auto; }
+        .log-item { padding: 8px 10px; margin-bottom: 8px; border-left: 4px solid var(--secondary); background: #f8f9fa; font-size: 0.9em; }
+        .log-success { border-left-color: var(--success); background: #eafaf1; }
+        .log-error { border-left-color: var(--danger); background: #fdedec; }
+        .log-info { border-left-color: var(--warning); background: #fef9e7; }
+        .legend { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--light); font-size: 0.85em; }
+        .badge { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+    <h1>Problema del Flujo Máximo - Grupo 7</h1>
+
+    <div id="setup-panel" class="panel">
+        <div class="control-group">
+            <span><strong>Elija el modo de generacion del grafo:</strong></span>
+            <button class="btn-blue" onclick="toggleMode('random')">🎲 Aleatorio</button>
+            <button class="btn-blue" onclick="toggleMode('manual')">✍️ Manual</button>
+        </div>
+        <div id="mode-random" class="hidden">
+            <div class="control-group">
+                <label>Introduzca la cantidad de nodos del grafo (de 8 a 16 max):</label>
+                <input type="number" id="n-random" min="8" max="16" value="10">
+                <button class="btn-green" onclick="generarAleatorio()">Generar grafo</button>
+            </div>
+        </div>
+        <div id="mode-manual" class="hidden">
+            <div class="control-group"><label>Introduzca la cantidad de nodos del grafo (de 8 a 16 max):</label><input type="number" id="n-manual" min="8" max="16" value="8"></div>
+            <label><b>Formato de entrada:</b> Vertice Inicial -> Vertice Final - Peso</label>
+            <label><b>Ejemplo:</b> 0 1 5 donde 0 y 1 son los vertices y 5 el peso de la arista que los conecta.</label>
+            <textarea id="manual-edges" placeholder="0 1 10&#10;0 2 8..."></textarea>
+            <button class="btn-green" style="margin-top:10px;" onclick="generarManual()">Generar grafo</button>
+        </div>
+    </div>
+
+    <div id="execution-panel" class="panel hidden">
+        <div class="control-group" style="background: #eafaf1; padding: 10px; border-radius: 6px;">
+            <span><strong>2. Confirme la fuente y el sumidero del grafo:</strong></span>
+            <label>Fuente (S):</label><select id="sel-fuente"></select>
+            <label>Sumidero (T):</label><select id="sel-sumidero"></select>
+            <button class="btn-blue" onclick="confirmarFuenteSumidero()">Confirmar</button>
+        </div>
+        <div id="algo-controls" class="control-group hidden">
+            <span><strong>3. Escoja una opcion:</strong></span>
+            <button id="btn-step" class="btn-orange" onclick="pasoAlgoritmo()">👣 Paso a paso</button>
+            <button id="btn-run" class="btn-green" onclick="ejecutarTodo()">🚀 Ir al resultado</button>
+            <button id="btn-reset" class="btn-gray" onclick="reiniciarFlujos()">🔄 Reiniciar grafo</button>
+            <label style="font-size: 0.9em; margin-left: 10px;"><input type="checkbox" id="chk-random-dfs">Aleatorizar búsqueda (ver alternativas)</label>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="network-view"></div>
+        <div id="log-view">
+            <h3 style="margin-top:0;">Bitácora</h3>
+            <div id="log-entries"></div>
+            <div class="legend">
+                <strong>Leyenda:</strong>
+                <div><span class="badge" style="background:#2ecc71"></span>Fuente ( S )</div>
+                <div><span class="badge" style="background:#e74c3c"></span>Sumidero ( T )</div>
+                <div><span class="badge" style="background:#f1c40f"></span>Nodos del Lado S de la cortadura</div>
+                <div style="margin-top:5px; display: flex; align-items: center;">
+                    <div style="width: 30px; height: 3px; background: #f39c12; margin-right: 8px;"></div>
+                    Flujo actual
+                </div>
+                <div style="margin-top:5px; display: flex; align-items: center;">
+                    <div style="width: 30px; height: 3px; background: red; margin-right: 8px;"></div>
+                    Línea Saturada.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let network, nodesDS = new vis.DataSet(), edgesDS = new vis.DataSet();
+        let grafo = {}, flujos = {}, N = 0, fuente = -1, sumidero = -1, pasos = 0, terminado = false, aristasCorte = [];
+
+        function toggleMode(mode) {
+            document.getElementById('mode-random').classList.toggle('hidden', mode !== 'random');
+            document.getElementById('mode-manual').classList.toggle('hidden', mode !== 'manual');
+            document.getElementById('execution-panel').classList.add('hidden');
+            limpiarLog();
+
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Destruir completamente el grafo y estado anterior al cambiar de modo
+            if (network) {
+                network.destroy(); // Destruye el objeto de red de Vis.js
+                network = null;    // Limpia la variable
+            }
+            // Limpiar el contenedor del grafo por si queda algo
+            document.getElementById('network-view').innerHTML = ''; 
+            
+            // Reiniciar todas las variables de estado global
+            grafo = {};
+            flujos = {};
+            N = 0;
+            fuente = -1;
+            sumidero = -1;
+            pasos = 0;
+            terminado = false;
+            aristasCorte = [];
+            nodesDS.clear(); // Vacía los datos de los nodos
+            edgesDS.clear(); // Vacía los datos de las aristas
+            // --- FIN DE LA CORRECCIÓN ---
+        }
+        function log(msg, type='') { document.getElementById('log-entries').insertAdjacentHTML('afterbegin', `<div class="log-item log-${type}">${msg}</div>`); }
+        function limpiarLog() { document.getElementById('log-entries').innerHTML = ''; }
+
+        function generarAleatorio() {
+            N = parseInt(document.getElementById('n-random').value);
+            if (N < 8 || N > 16) return log("Error: N debe estar entre [8, 16]", 'error');
+            grafo = Array.from({length: N}, () => ({}));
+            for (let u = 0; u < N-1; u++) {
+                let intentos = Math.floor(Math.random() * 4) + 2;
+                for (let k = 0; k < intentos; k++) {
+                    let salto = Math.floor(Math.random() * Math.min(N - 1 - u, 6)) + 1;
+                    let v = u + salto;
+                    if (v < N && !grafo[u][v]) {
+                        grafo[u][v] = Math.floor(Math.random() * 20) + 5;
+                    }
+                }
+                if (u < N - 1 && Object.keys(grafo[u]).length === 0) {
+                     let v = u + 1;
+                     if (v < N) grafo[u][v] = Math.floor(Math.random() * 20) + 5;
+                }
+            }
+            prepararVisualizacion();
+            log(`Grafo aleatorio de ${N} nodos generado.`);
+        }
+
+        function generarManual() {
+            N = parseInt(document.getElementById('n-manual').value);
+            if (N < 8 || N > 16) return log("Error: N debe estar entre [8, 16]", 'error');
+            grafo = Array.from({length: N}, () => ({}));
+            try {
+                document.getElementById('manual-edges').value.trim().split('\n').forEach(linea => {
+                    let [u, v, c] = linea.trim().split(/\s+/).map(Number);
+                    if (!isNaN(u) && !isNaN(v) && !isNaN(c) && u>=0 && u<N && v>=0 && v<N && c>0) grafo[u][v] = c;
+                });
+                prepararVisualizacion();
+                log("Grafo manual construido.");
+            } catch (e) { log("Error en formato manual.", 'error'); }
+        }
+
+        function prepararVisualizacion() {
+            nodesDS.clear(); edgesDS.clear();
+            for (let i = 0; i < N; i++) nodesDS.add({ id: i, label: `${i}`, color: '#3498db' });
+            for (let u = 0; u < N; u++) {
+                for (let v in grafo[u]) {
+                    edgesDS.add({ id: `${u}-${v}`, from: u, to: parseInt(v), capacity: grafo[u][v], label: `0/${grafo[u][v]}`, arrows:'to', color:'#95a5a6' });
+                }
+            }
+            if (network) network.destroy();
+
+            network = new vis.Network(document.getElementById('network-view'), { nodes: nodesDS, edges: edgesDS }, {
+                layout: {
+                    hierarchical: {
+                        direction: 'LR',
+                        sortMethod: 'directed',
+                        levelSeparation: 250,
+                        nodeSpacing: 150,
+                        treeSpacing: 200,
+                        blockShifting: true,
+                        edgeMinimization: true,
+                        parentCentralization: true
+                    }
+                },
+                physics: false,
+                edges: { smooth: false, font: { align: 'top', size: 16 } },
+                nodes: { font: { color: 'white' }, borderWidth: 2, size: 30 },
+                interaction: { dragNodes: true, zoomView: true, dragView: true }
+            });
+
+            // DIBUJO DE LA LÍNEA DE CORTE
+            network.on("afterDrawing", (ctx) => {
+                if (aristasCorte.length === 0) return;
+                let sumX = 0, sumY = 0, sumDx = 0, sumDy = 0, count = 0;
+                aristasCorte.forEach(edgeId => {
+                    const edge = edgesDS.get(edgeId);
+                    if (!edge) return;
+                    const posU = network.getPositions([edge.from])[edge.from];
+                    const posV = network.getPositions([edge.to])[edge.to];
+                    sumX += (posU.x + posV.x) / 2;
+                    sumY += (posU.y + posV.y) / 2;
+                    sumDx += (posV.x - posU.x);
+                    sumDy += (posV.y - posU.y);
+                    count++;
+                });
+                if (count === 0) return;
+                const avgX = sumX / count; const avgY = sumY / count;
+                const avgDx = sumDx / count; const avgDy = sumDy / count;
+                let perpDx = -avgDy; let perpDy = avgDx;
+                const len = Math.sqrt(perpDx*perpDx + perpDy*perpDy);
+                if (len > 0) { perpDx /= len; perpDy /= len; }
+                ctx.save();
+                ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]); ctx.beginPath();
+                ctx.moveTo(avgX - perpDx * 1400, avgY - perpDy * 1400);
+                ctx.lineTo(avgX + perpDx * 1400, avgY + perpDy * 1400);
+                ctx.stroke(); ctx.restore();
+            });
+
+            const sSel = document.getElementById('sel-fuente'), tSel = document.getElementById('sel-sumidero');
+            sSel.innerHTML = tSel.innerHTML = '';
+            for(let i=0; i<N; i++) { sSel.add(new Option(`Nodo ${i}`, i)); tSel.add(new Option(`Nodo ${i}`, i)); }
+            sSel.value = 0; tSel.value = N-1;
+            document.getElementById('execution-panel').classList.remove('hidden');
+            document.getElementById('algo-controls').classList.add('hidden');
+            network.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
+        }
+
+        function confirmarFuenteSumidero() {
+            fuente = parseInt(document.getElementById('sel-fuente').value);
+            sumidero = parseInt(document.getElementById('sel-sumidero').value);
+            if (fuente === sumidero) return log("Error: S y T deben ser distintos.", 'error');
+            nodesDS.update([{id: fuente, label:`S (${fuente})`, color:'#2ecc71'}, {id: sumidero, label:`T (${sumidero})`, color:'#e74c3c'}]);
+            document.getElementById('algo-controls').classList.remove('hidden');
+            reiniciarFlujos();
+        }
+
+        function reiniciarFlujos() {
+            flujos = {}; pasos = 0; terminado = false; aristasCorte = [];
+            for(let u=0; u<N; u++) flujos[u] = {};
+            edgesDS.forEach(e => {
+                if (grafo[e.from] && grafo[e.from][e.to]) {
+                     edgesDS.update({id: e.id, label: `0/${e.capacity}`, color: '#95a5a6', width: 1});
+                }
+            });
+            nodesDS.forEach(n => { if(n.id!==fuente && n.id!==sumidero) nodesDS.update({id: n.id, color:'#3498db'}); });
+            network.redraw();
+            limpiarLog();
+            log("Listo para ejecutar.");
+        }
+
+        // --- ¡CAMBIO IMPORTANTE! Reemplazamos DFS por BFS ---
+        /**
+         * Realiza una Búsqueda en Anchura (BFS) para encontrar el camino más corto
+         * en el grafo residual.
+         * Devuelve: { encontrado: boolean, visitados: Set }
+         */
+        function bfs(s, t, padre, res) {
+            let visitados = new Set([s]);
+            let q = [s]; // Cola para BFS
+            padre[s] = -1; // Marcar la fuente
+
+            while (q.length > 0) {
+                let u = q.shift();
+                
+                let vecinos = Object.keys(res[u]);
+                // Aleatorizar el orden de los vecinos si la casilla está marcada
+                if (document.getElementById('chk-random-dfs').checked) {
+                    vecinos.sort(() => Math.random() - 0.5);
+                }
+
+                for (let v_str of vecinos) {
+                    let v = parseInt(v_str);
+                    if (!visitados.has(v) && res[u][v] > 0) {
+                        q.push(v);
+                        visitados.add(v);
+                        padre[v] = u;
+                        if (v === t) {
+                            // Encontramos el sumidero. 'visitados' no es relevante aquí.
+                            return { encontrado: true, visitados: visitados };
+                        }
+                    }
+                }
+            }
+            // No se encontró camino. 'visitados' ahora contiene
+            // todos los nodos alcanzables desde S (para el Corte Mínimo).
+            return { encontrado: false, visitados: visitados };
+        }
+
+
+        function pasoAlgoritmo() {
+            if (terminado) return;
+            
+            // 1. Construir Grafo Residual
+            let res = Array.from({length: N}, () => ({}));
+            edgesDS.forEach(e => {
+                let f = flujos[e.from]?.[e.to] || 0;
+                // Arista hacia adelante
+                res[e.from][e.to] = (res[e.from][e.to]||0) + (e.capacity - f);
+                // Arista hacia atrás (para anulación)
+                res[e.to][e.from] = (res[e.to][e.from]||0) + f;
+            });
+
+            // 2. Buscar camino con BFS (Edmonds-Karp)
+            let padre = {};
+            let resultadoBusqueda = bfs(fuente, sumidero, padre, res);
+
+            if (resultadoBusqueda.encontrado) {
+                pasos++;
+                // 3. Encontrar cuello de botella
+                let curr = sumidero, cuello = Infinity, camino = [];
+                while(curr !== fuente) {
+                    let p = padre[curr];
+                    cuello = Math.min(cuello, res[p][curr]);
+                    camino.push([p, curr]); // Camino sale al revés (T -> S)
+                    curr = p;
+                }
+                
+                // 4. Actualizar flujos
+                camino.forEach(([u,v]) => {
+                    // Si la arista u->v existe en el grafo original, aumentamos flujo
+                    if(grafo[u] && grafo[u][v]!==undefined) {
+                        flujos[u][v] = (flujos[u][v]||0) + cuello;
+                    } else {
+                        // Si no, es una arista de anulación (v->u), reducimos flujo
+                        flujos[v][u] -= cuello;
+                    }
+                });
+                
+                actualizarVista(camino.reverse()); // Invertimos el camino (S -> T) para la visualización
+                log(`Paso ${pasos}: Flujo de ${cuello} por [${camino.map(p => p.join('→')).join(', ')}]`, 'info');
+            } else {
+                terminado = true;
+                // 5. No hay más caminos, finalizar y mostrar corte
+                finalizar(resultadoBusqueda.visitados);
+            }
+        }
+
+        function ejecutarTodo() {
+            let safety=0; while(!terminado && safety++<2*N) pasoAlgoritmo(); // Límite de seguridad
+        }
+
+        // --- FUNCIÓN ACTUALIZARVISTA CORREGIDA ---
+        function actualizarVista(camino) { // 'camino' ahora es (S -> T)
+            edgesDS.forEach(e => {
+                let f = flujos[e.from]?.[e.to] || 0;
+                
+                // Revisa si la arista original (e.from -> e.to) está en el camino
+                let esCaminoAdelante = camino.some(p => p[0] === e.from && p[1] === e.to);
+                // Revisa si la arista INVERSA (e.to -> e.from) está en el camino
+                let esCaminoAtras = camino.some(p => p[0] === e.to && p[1] === e.from);
+                
+                // Si cualquiera de las dos es verdadera, la arista es parte del camino
+                let enCamino = esCaminoAdelante || esCaminoAtras;
+
+                edgesDS.update({
+                    id: e.id, label: `${f}/${e.capacity}`,
+                    width: 1 + (f/e.capacity)*3,
+                    color: f===e.capacity ? '#e74c3c' : (enCamino ? '#f39c12' : '#95a5a6')
+                });
+            });
+        }
+
+        function finalizar(corteS) {
+            let total = 0;
+            for(let v in (flujos[fuente] || {})) total += flujos[fuente][v];
+            log(`✅ <strong>Flujo Máximo: ${total}</strong>`, 'success');
+            
+            corteS.forEach(u => { if(u!==fuente && u!==sumidero) nodesDS.update({id: u, color: '#f1c40f'}); });
+            
+            aristasCorte = [];
+            edgesDS.forEach(e => {
+                // Una arista es parte del corte si va de un nodo "alcanzable" (en corteS)
+                // a un nodo "no alcanzable" (no en corteS).
+                if (corteS.has(e.from) && !corteS.has(e.to)) {
+                    aristasCorte.push(e.id);
+                }
+            });
+            network.redraw(); // Dispara el evento 'afterDrawing'
+            log(`ℹ️ Cortadura representada mediante una linea punteada roja.`, 'info');
+        }
+    </script>
+</body>
+</html>

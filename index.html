@@ -3,38 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ford-Fulkerson (Edmonds-Karp): Flujo Máximo</title>
+    <title>Ford-Fulkerson: Grupo 7</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
+        /* definimos una paleta de colores para la pagina */
         :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --light: #ecf0f1; }
+        
+        /* estilos generales */
         body { font-family: 'Segoe UI', sans-serif; background: #f5f6fa; margin: 0; padding: 20px; color: var(--primary); display: flex; flex-direction: column; height: 95vh; }
         h1 { text-align: center; margin-bottom: 10px; }
+        
+        /* estilo para los paneles blancos */
         .panel { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
-        .hidden { display: none; }
+        .hidden { display: none; } /* clase para ocultar cosas */
+        
+        /* para agrupar botones y labels */
         .control-group { margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         label { font-weight: 600; margin-right: 5px; }
         input[type="number"], select { padding: 10px; border: 2px solid var(--light); border-radius: 4px; width: 100px; }
+        /* el cajon de texto para el modo manual */
         textarea { width: 100%; height: 80px; padding: 8px; border: 2px solid var(--light); border-radius: 4px; font-family: monospace; resize: vertical; }
+        
+        /* botones */
         button { padding: 10px 18px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: white; transition: 0.2s; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-blue { background: var(--secondary); } .btn-blue:hover { background: #2980b9; }
         .btn-green { background: var(--success); } .btn-green:hover { background: #219a52; }
         .btn-orange { background: var(--warning); } .btn-orange:hover { background: #d68910; }
         .btn-gray { background: #95a5a6; } .btn-gray:hover { background: #7f8c8d; }
+        
+        /* layout principal Lado-a-Lado */
         #main-container { display: flex; flex: 1; gap: 20px; min-height: 400px; }
+        /* aca va el grafo */
         #network-view { flex: 3; border-radius: 8px; border: 2px solid var(--light); background: white; }
+        /* aca va la bitacora */
         #log-view { flex: 1; display: flex; flex-direction: column; background: white; border-radius: 8px; border: 2px solid var(--light); padding: 15px; overflow-y: auto; }
+        
+        /* estilo de cada linea en la bitacora */
         .log-item { padding: 8px 10px; margin-bottom: 8px; border-left: 4px solid var(--secondary); background: #f8f9fa; font-size: 0.9em; }
         .log-success { border-left-color: var(--success); background: #eafaf1; }
         .log-error { border-left-color: var(--danger); background: #fdedec; }
         .log-info { border-left-color: var(--warning); background: #fef9e7; }
+        
+        /* la leyenda de abajo */
         .legend { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--light); font-size: 0.85em; }
         .badge { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
     </style>
 </head>
 <body>
 
-    <h1>Problema del Flujo Máximo - Grupo 7</h1>
+    <h1>Problema del Flujo Maximo - Grupo 7</h1>
 
     <div id="setup-panel" class="panel">
         <div class="control-group">
@@ -97,25 +115,43 @@
     </div>
 
     <script>
-        let network, nodesDS = new vis.DataSet(), edgesDS = new vis.DataSet();
-        let grafo = {}, flujos = {}, N = 0, fuente = -1, sumidero = -1, pasos = 0, terminado = false, aristasCorte = [];
+        // --- Variables Globales ---
+        // network es el objeto de Vis.js que pinta el grafo
+        let network;
+        // nodesDS y edgesDS guardan los nodos y aristas
+        let nodesDS = new vis.DataSet(), edgesDS = new vis.DataSet();
+        
+        // 'grafo' guarda la estructura original, la capacidad maxima
+        let grafo = {};
+        // 'flujos' guarda cuanto flujo esta pasando ahora
+        let flujos = {};
+        // N es el total de nodos
+        let N = 0;
+        // 'fuente' y 'sumidero' (S y T)
+        let fuente = -1, sumidero = -1;
+        // variables de control
+        let pasos = 0, terminado = false;
+        // 'aristasCorte' guarda las aristas pa dibujar la linea roja
+        let aristasCorte = [];
 
+        // --- Funciones de la Interfaz ---
+
+        // Muestra/oculta los paneles de aleatorio o manual
         function toggleMode(mode) {
             document.getElementById('mode-random').classList.toggle('hidden', mode !== 'random');
             document.getElementById('mode-manual').classList.toggle('hidden', mode !== 'manual');
             document.getElementById('execution-panel').classList.add('hidden');
-            limpiarLog();
+            limpiarLog(); // limpia la bitacora
 
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Destruir completamente el grafo y estado anterior al cambiar de modo
+            // --- Correccion del bug al cambiar modo ---
+            // Al cambiar de modo, destruimos el grafo viejo pa q no se bloquee
             if (network) {
-                network.destroy(); // Destruye el objeto de red de Vis.js
-                network = null;    // Limpia la variable
+                network.destroy(); // destruye el objeto vis.js
+                network = null;    // limpia la variable
             }
-            // Limpiar el contenedor del grafo por si queda algo
-            document.getElementById('network-view').innerHTML = ''; 
+            document.getElementById('network-view').innerHTML = ''; // Limpia el div
             
-            // Reiniciar todas las variables de estado global
+            // Reinicia todas las variables
             grafo = {};
             flujos = {};
             N = 0;
@@ -124,267 +160,331 @@
             pasos = 0;
             terminado = false;
             aristasCorte = [];
-            nodesDS.clear(); // Vacía los datos de los nodos
-            edgesDS.clear(); // Vacía los datos de las aristas
-            // --- FIN DE LA CORRECCIÓN ---
+            nodesDS.clear(); // Limpia los datos de vis
+            edgesDS.clear();
         }
+
+        // funcion para añadir un mensaje a la bitacora
         function log(msg, type='') { document.getElementById('log-entries').insertAdjacentHTML('afterbegin', `<div class="log-item log-${type}">${msg}</div>`); }
+        // funcion para limpiar la bitacora
         function limpiarLog() { document.getElementById('log-entries').innerHTML = ''; }
 
+        // --- Funciones para Generar el Grafo ---
+
+        // Genera un grafo aleatorio mas "lleno"
         function generarAleatorio() {
-            N = parseInt(document.getElementById('n-random').value);
-            if (N < 8 || N > 16) return log("Error: N debe estar entre [8, 16]", 'error');
-            grafo = Array.from({length: N}, () => ({}));
+            N = parseInt(document.getElementById('n-random').value); // agarra el numero de nodos
+            if (N < 8 || N > 16) return log("Error: N debe estar entre [8, 16]", 'error'); // valida N
+            grafo = Array.from({length: N}, () => ({})); // inicializa el grafo vacio
+            
+            // recorre los nodos para crear aristas
             for (let u = 0; u < N-1; u++) {
-                let intentos = Math.floor(Math.random() * 4) + 2;
+                let intentos = Math.floor(Math.random() * 4) + 2; // 2 a 5 aristas
                 for (let k = 0; k < intentos; k++) {
+                    // permite que salten nodos, pa q no sea lineal
                     let salto = Math.floor(Math.random() * Math.min(N - 1 - u, 6)) + 1;
                     let v = u + salto;
+                    // si la arista no existe, la crea
                     if (v < N && !grafo[u][v]) {
-                        grafo[u][v] = Math.floor(Math.random() * 20) + 5;
+                        grafo[u][v] = Math.floor(Math.random() * 20) + 5; // Capacidad 5-25
                     }
                 }
+                // asegura al menos una arista pa adelante
                 if (u < N - 1 && Object.keys(grafo[u]).length === 0) {
                      let v = u + 1;
                      if (v < N) grafo[u][v] = Math.floor(Math.random() * 20) + 5;
                 }
             }
-            prepararVisualizacion();
+            prepararVisualizacion(); // llama a la funcion que dibuja
             log(`Grafo aleatorio de ${N} nodos generado.`);
         }
 
+        // Lee el textarea y crea el grafo manual
         function generarManual() {
-            N = parseInt(document.getElementById('n-manual').value);
+            N = parseInt(document.getElementById('n-manual').value); // agarra el numero de nodos
             if (N < 8 || N > 16) return log("Error: N debe estar entre [8, 16]", 'error');
-            grafo = Array.from({length: N}, () => ({}));
+            grafo = Array.from({length: N}, () => ({})); // inicializa
             try {
+                // lee cada linea
                 document.getElementById('manual-edges').value.trim().split('\n').forEach(linea => {
+                    // parte la linea "u v c"
                     let [u, v, c] = linea.trim().split(/\s+/).map(Number);
-                    if (!isNaN(u) && !isNaN(v) && !isNaN(c) && u>=0 && u<N && v>=0 && v<N && c>0) grafo[u][v] = c;
+                    // si es valida, guarda la arista (dirigida)
+                    if (!isNaN(u) && !isNaN(v) && !isNaN(c) && u>=0 && u<N && v>=0 && v<N && c>0) {
+                        grafo[u][v] = c;
+                    }
                 });
-                prepararVisualizacion();
+                prepararVisualizacion(); // dibuja
                 log("Grafo manual construido.");
             } catch (e) { log("Error en formato manual.", 'error'); }
         }
 
+        // --- Funciones de Visualizacion (Vis.js) ---
+
+        // Dibuja el grafo y configura Vis.js
         function prepararVisualizacion() {
-            nodesDS.clear(); edgesDS.clear();
+            nodesDS.clear(); edgesDS.clear(); // limpia los datos viejos
+            // añade los nodos al dataset
             for (let i = 0; i < N; i++) nodesDS.add({ id: i, label: `${i}`, color: '#3498db' });
+            // añade las aristas al dataset
             for (let u = 0; u < N; u++) {
                 for (let v in grafo[u]) {
+                    // el id "u-v" es para buscarla facil despues
                     edgesDS.add({ id: `${u}-${v}`, from: u, to: parseInt(v), capacity: grafo[u][v], label: `0/${grafo[u][v]}`, arrows:'to', color:'#95a5a6' });
                 }
             }
-            if (network) network.destroy();
+            if (network) network.destroy(); // limpia el grafo anterior
 
+            // Aca se crea el objeto grafo de Vis.js
             network = new vis.Network(document.getElementById('network-view'), { nodes: nodesDS, edges: edgesDS }, {
+                // Opciones de layout (ordenado)
                 layout: {
                     hierarchical: {
-                        direction: 'LR',
-                        sortMethod: 'directed',
-                        levelSeparation: 250,
-                        nodeSpacing: 150,
+                        direction: 'LR',           // de Izquierda (L) a Derecha (R)
+                        sortMethod: 'directed',    // Ordena segun las flechas
+                        levelSeparation: 250,      // espacio horizontal
+                        nodeSpacing: 150,          // espacio vertical
                         treeSpacing: 200,
                         blockShifting: true,
                         edgeMinimization: true,
                         parentCentralization: true
                     }
                 },
-                physics: false,
+                physics: false, // apagamos la fisica pa q sea estatico
                 edges: { smooth: false, font: { align: 'top', size: 16 } },
                 nodes: { font: { color: 'white' }, borderWidth: 2, size: 30 },
-                interaction: { dragNodes: true, zoomView: true, dragView: true }
+                interaction: { dragNodes: true, zoomView: true, dragView: true } // permite mover nodos
             });
 
-            // DIBUJO DE LA LÍNEA DE CORTE
+            // --- DIBUJO DE LA LINEA DE CORTE ---
+            // 'afterDrawing' se activa despues de dibujar
             network.on("afterDrawing", (ctx) => {
+                // si no hay aristas de corte, no hace nada
                 if (aristasCorte.length === 0) return;
+                
                 let sumX = 0, sumY = 0, sumDx = 0, sumDy = 0, count = 0;
+                
+                // 1. Calcula el "centro" de todas las aristas del corte
                 aristasCorte.forEach(edgeId => {
                     const edge = edgesDS.get(edgeId);
                     if (!edge) return;
                     const posU = network.getPositions([edge.from])[edge.from];
                     const posV = network.getPositions([edge.to])[edge.to];
-                    sumX += (posU.x + posV.x) / 2;
+                    sumX += (posU.x + posV.x) / 2; // suma punto medio
                     sumY += (posU.y + posV.y) / 2;
-                    sumDx += (posV.x - posU.x);
+                    sumDx += (posV.x - posU.x); // suma direccion
                     sumDy += (posV.y - posU.y);
                     count++;
                 });
+
                 if (count === 0) return;
+                
+                // 2. saca el promedio de posicion y direccion
                 const avgX = sumX / count; const avgY = sumY / count;
                 const avgDx = sumDx / count; const avgDy = sumDy / count;
+                
+                // 3. calcula el vector perpendicular
                 let perpDx = -avgDy; let perpDy = avgDx;
                 const len = Math.sqrt(perpDx*perpDx + perpDy*perpDy);
                 if (len > 0) { perpDx /= len; perpDy /= len; }
+                
+                // 4. dibuja la linea roja
                 ctx.save();
                 ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
-                ctx.setLineDash([10, 5]); ctx.beginPath();
+                ctx.setLineDash([10, 5]); // linea punteada
+                ctx.beginPath();
+                // dibuja la linea (1400px pa cada lado)
                 ctx.moveTo(avgX - perpDx * 1400, avgY - perpDy * 1400);
                 ctx.lineTo(avgX + perpDx * 1400, avgY + perpDy * 1400);
-                ctx.stroke(); ctx.restore();
+                ctx.stroke(); 
+                ctx.restore();
             });
+            // --- FIN DEL DIBUJO ---
 
+            // Llena los menus <select> pa elegir S y T
             const sSel = document.getElementById('sel-fuente'), tSel = document.getElementById('sel-sumidero');
             sSel.innerHTML = tSel.innerHTML = '';
             for(let i=0; i<N; i++) { sSel.add(new Option(`Nodo ${i}`, i)); tSel.add(new Option(`Nodo ${i}`, i)); }
-            sSel.value = 0; tSel.value = N-1;
+            sSel.value = 0; tSel.value = N-1; // pone 0 y N-1 por defecto
+            
+            // muestra el panel 2
             document.getElementById('execution-panel').classList.remove('hidden');
             document.getElementById('algo-controls').classList.add('hidden');
+            
+            // centra el grafo en la pantalla
             network.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
         }
 
+        // Guarda S y T al confirmar
         function confirmarFuenteSumidero() {
             fuente = parseInt(document.getElementById('sel-fuente').value);
             sumidero = parseInt(document.getElementById('sel-sumidero').value);
             if (fuente === sumidero) return log("Error: S y T deben ser distintos.", 'error');
+            // Pinta S (verde) y T (rojo)
             nodesDS.update([{id: fuente, label:`S (${fuente})`, color:'#2ecc71'}, {id: sumidero, label:`T (${sumidero})`, color:'#e74c3c'}]);
             document.getElementById('algo-controls').classList.remove('hidden');
-            reiniciarFlujos();
+            reiniciarFlujos(); // prepara todo
         }
 
+        // --- Logica del Algoritmo (Edmonds-Karp) ---
+
+        // Reinicia los flujos a 0
         function reiniciarFlujos() {
             flujos = {}; pasos = 0; terminado = false; aristasCorte = [];
             for(let u=0; u<N; u++) flujos[u] = {};
+            
+            // resetea etiquetas y colores de aristas
             edgesDS.forEach(e => {
                 if (grafo[e.from] && grafo[e.from][e.to]) {
                      edgesDS.update({id: e.id, label: `0/${e.capacity}`, color: '#95a5a6', width: 1});
                 }
             });
+            // resetea colores de nodos
             nodesDS.forEach(n => { if(n.id!==fuente && n.id!==sumidero) nodesDS.update({id: n.id, color:'#3498db'}); });
-            network.redraw();
+            
+            network.redraw(); // redibuja (limpia la linea roja)
             limpiarLog();
             log("Listo para ejecutar.");
         }
 
-        // --- ¡CAMBIO IMPORTANTE! Reemplazamos DFS por BFS ---
-        /**
-         * Realiza una Búsqueda en Anchura (BFS) para encontrar el camino más corto
-         * en el grafo residual.
-         * Devuelve: { encontrado: boolean, visitados: Set }
-         */
+        // Aca usamos BFS (Busqueda en Anchura)
+        // Es Edmonds-Karp: usa BFS pa hallar el camino mas corto
+        // Asi evitamos los flujos "raros"
         function bfs(s, t, padre, res) {
-            let visitados = new Set([s]);
-            let q = [s]; // Cola para BFS
-            padre[s] = -1; // Marcar la fuente
+            let visitados = new Set([s]); // los nodos q ya vimos
+            let q = [s]; // la cola del BFS
+            padre[s] = -1; // 'padre' es para saber de donde vinimos
 
+            // mientras haya nodos en la cola
             while (q.length > 0) {
                 let u = q.shift();
+                let vecinos = Object.keys(res[u]); // agarra los vecinos
                 
-                let vecinos = Object.keys(res[u]);
-                // Aleatorizar el orden de los vecinos si la casilla está marcada
+                // si marcaron el check, baraja los vecinos
                 if (document.getElementById('chk-random-dfs').checked) {
                     vecinos.sort(() => Math.random() - 0.5);
                 }
 
+                // revisa cada vecino
                 for (let v_str of vecinos) {
                     let v = parseInt(v_str);
+                    // si no lo visite Y hay capacidad...
                     if (!visitados.has(v) && res[u][v] > 0) {
                         q.push(v);
                         visitados.add(v);
-                        padre[v] = u;
+                        padre[v] = u; // guardo de donde vine
                         if (v === t) {
-                            // Encontramos el sumidero. 'visitados' no es relevante aquí.
+                            // ¡Encontre T!
                             return { encontrado: true, visitados: visitados };
                         }
                     }
                 }
             }
-            // No se encontró camino. 'visitados' ahora contiene
-            // todos los nodos alcanzables desde S (para el Corte Mínimo).
+            // No hay mas caminos
+            // 'visitados' tiene los nodos del Lado S
             return { encontrado: false, visitados: visitados };
         }
 
-
+        // Se llama al presionar "Paso a paso"
         function pasoAlgoritmo() {
-            if (terminado) return;
+            if (terminado) return; // si ya acabo, no hace nada
             
-            // 1. Construir Grafo Residual
+            // 1. Construir el Grafo Residual
+            // Nos dice cuanta capacidad queda
+            // y cuanto flujo podemos "devolver" (anular)
             let res = Array.from({length: N}, () => ({}));
             edgesDS.forEach(e => {
                 let f = flujos[e.from]?.[e.to] || 0;
-                // Arista hacia adelante
+                // arista hacia adelante (capacidad restante)
                 res[e.from][e.to] = (res[e.from][e.to]||0) + (e.capacity - f);
-                // Arista hacia atrás (para anulación)
+                // arista hacia atras (flujo anulable)
                 res[e.to][e.from] = (res[e.to][e.from]||0) + f;
             });
 
-            // 2. Buscar camino con BFS (Edmonds-Karp)
+            // 2. Buscar camino con BFS
             let padre = {};
             let resultadoBusqueda = bfs(fuente, sumidero, padre, res);
 
+            // 3. Si encontramos camino...
             if (resultadoBusqueda.encontrado) {
                 pasos++;
-                // 3. Encontrar cuello de botella
+                // 4. Hallar el cuello de botella (el minimo del camino)
                 let curr = sumidero, cuello = Infinity, camino = [];
                 while(curr !== fuente) {
                     let p = padre[curr];
                     cuello = Math.min(cuello, res[p][curr]);
-                    camino.push([p, curr]); // Camino sale al revés (T -> S)
+                    camino.push([p, curr]); // el camino se guarda al reves
                     curr = p;
                 }
                 
-                // 4. Actualizar flujos
+                // 5. Actualizar los flujos
                 camino.forEach(([u,v]) => {
-                    // Si la arista u->v existe en el grafo original, aumentamos flujo
+                    // si la arista (u,v) es normal...
                     if(grafo[u] && grafo[u][v]!==undefined) {
-                        flujos[u][v] = (flujos[u][v]||0) + cuello;
+                        flujos[u][v] = (flujos[u][v]||0) + cuello; // sumamos flujo
                     } else {
-                        // Si no, es una arista de anulación (v->u), reducimos flujo
-                        flujos[v][u] -= cuello;
+                        // si no, es una arista "fantasma" de anulacion
+                        flujos[v][u] -= cuello; // restamos flujo (anulamos)
                     }
                 });
                 
-                actualizarVista(camino.reverse()); // Invertimos el camino (S -> T) para la visualización
+                // damos vuelta al camino (S->T) para pintarlo
+                actualizarVista(camino.reverse()); 
                 log(`Paso ${pasos}: Flujo de ${cuello} por [${camino.map(p => p.join('→')).join(', ')}]`, 'info');
             } else {
+                // 6. No hay mas caminos, terminamos
                 terminado = true;
-                // 5. No hay más caminos, finalizar y mostrar corte
-                finalizar(resultadoBusqueda.visitados);
+                finalizar(resultadoBusqueda.visitados); // 'visitados' es el Lado S
             }
         }
 
+        // Llama a "paso" hasta que termine
         function ejecutarTodo() {
-            let safety=0; while(!terminado && safety++<2*N) pasoAlgoritmo(); // Límite de seguridad
+            let safety=0; while(!terminado && safety++<2*N) pasoAlgoritmo();
         }
 
-        // --- FUNCIÓN ACTUALIZARVISTA CORREGIDA ---
-        function actualizarVista(camino) { // 'camino' ahora es (S -> T)
+        // Pinta el grafo despues de cada paso
+        function actualizarVista(camino) { // 'camino' es [S, ..., T]
             edgesDS.forEach(e => {
-                let f = flujos[e.from]?.[e.to] || 0;
+                let f = flujos[e.from]?.[e.to] || 0; // flujo actual
                 
-                // Revisa si la arista original (e.from -> e.to) está en el camino
+                // revisa si la arista (u->v) esta en el camino
                 let esCaminoAdelante = camino.some(p => p[0] === e.from && p[1] === e.to);
-                // Revisa si la arista INVERSA (e.to -> e.from) está en el camino
+                // revisa si la arista INVERSA (v->u) esta en el camino (la de anulacion)
                 let esCaminoAtras = camino.some(p => p[0] === e.to && p[1] === e.from);
                 
-                // Si cualquiera de las dos es verdadera, la arista es parte del camino
+                // si es cualquiera de las dos, la marcamos
                 let enCamino = esCaminoAdelante || esCaminoAtras;
 
+                // actualiza el dibujo de la arista
                 edgesDS.update({
-                    id: e.id, label: `${f}/${e.capacity}`,
-                    width: 1 + (f/e.capacity)*3,
+                    id: e.id, label: `${f}/${e.capacity}`, // pone "flujo / capacidad"
+                    width: 1 + (f/e.capacity)*3, // grosor segun el flujo
+                    // rojo (saturada), amarillo (camino actual), gris (normal)
                     color: f===e.capacity ? '#e74c3c' : (enCamino ? '#f39c12' : '#95a5a6')
                 });
             });
         }
 
-        function finalizar(corteS) {
+        // Muestra los resultados finales
+        function finalizar(corteS) { // 'corteS' son los nodos del Lado S
             let total = 0;
+            // Suma todo el flujo que sale de S
             for(let v in (flujos[fuente] || {})) total += flujos[fuente][v];
-            log(`✅ <strong>Flujo Máximo: ${total}</strong>`, 'success');
+            log(`✅ <strong>Flujo Maximo: ${total}</strong>`, 'success');
             
+            // Pinta de amarillo los nodos del Lado S
             corteS.forEach(u => { if(u!==fuente && u!==sumidero) nodesDS.update({id: u, color: '#f1c40f'}); });
             
+            // Guarda las aristas que cruzan el corte (de Lado S a Lado T)
             aristasCorte = [];
             edgesDS.forEach(e => {
-                // Una arista es parte del corte si va de un nodo "alcanzable" (en corteS)
-                // a un nodo "no alcanzable" (no en corteS).
                 if (corteS.has(e.from) && !corteS.has(e.to)) {
                     aristasCorte.push(e.id);
                 }
             });
-            network.redraw(); // Dispara el evento 'afterDrawing'
+            
+            network.redraw(); // Redibuja para que 'afterDrawing' pinte la linea
             log(`ℹ️ Cortadura representada mediante una linea punteada roja.`, 'info');
         }
     </script>

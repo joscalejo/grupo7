@@ -88,7 +88,7 @@
             <button id="btn-step" class="btn-orange" onclick="pasoAlgoritmo()">👣 Paso a paso</button>
             <button id="btn-run" class="btn-green" onclick="ejecutarTodo()">🚀 Ir al resultado</button>
             <button id="btn-reset" class="btn-gray" onclick="reiniciarFlujos()">🔄 Reiniciar grafo</button>
-            <label style="font-size: 0.9em; margin-left: 10px;"><input type="checkbox" id="chk-random-dfs">Aleatorizar búsqueda (ver alternativas)</label>
+            <label style="font-size: 0.9em; margin-left: 10px;"><input type="checkbox" id="chk-random-dfs">Aleatorizar búsqueda (ver alternativas)   -   Presionar CTRL + Rueda del mouse arriba o abajo para aumentar o disminuir zoom del grafo</label>
         </div>
     </div>
 
@@ -219,7 +219,7 @@
             } catch (e) { log("Error en formato manual.", 'error'); }
         }
 
-        // --- Funciones de Visualizacion (Vis.js) ---
+        // --- Funciones de Visualizacion ---
 
         // Dibuja el grafo y configura Vis.js
         function prepararVisualizacion() {
@@ -290,7 +290,7 @@
                 
                 // 4. dibuja la linea roja
                 ctx.save();
-                ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+                ctx.strokeStyle = '#F527EE'; ctx.lineWidth = 3;
                 ctx.setLineDash([10, 5]); // linea punteada
                 ctx.beginPath();
                 // dibuja la linea (1400px pa cada lado)
@@ -326,7 +326,7 @@
             reiniciarFlujos(); // prepara todo
         }
 
-        // --- Logica del Algoritmo (Edmonds-Karp) ---
+        // --- Logica del Algoritmo ---
 
         // Reinicia los flujos a 0
         function reiniciarFlujos() {
@@ -348,8 +348,8 @@
         }
 
         // Aca usamos BFS (Busqueda en Anchura)
-        // Es Edmonds-Karp: usa BFS pa hallar el camino mas corto
-        // Asi evitamos los flujos "raros"
+        // usa BFS pa hallar el camino mas corto
+        // asi evitamos los flujos "raros"
         function bfs(s, t, padre, res) {
             let visitados = new Set([s]); // los nodos q ya vimos
             let q = [s]; // la cola del BFS
@@ -485,7 +485,7 @@
             });
             
             network.redraw(); // Redibuja para que 'afterDrawing' pinte la linea
-            log(`ℹ️ Cortadura representada mediante una linea punteada roja.`, 'info');
+            log(`ℹ️ Cortadura representada mediante una linea punteada rosada.`, 'info');
         }
     </script>
 </body>

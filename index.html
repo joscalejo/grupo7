@@ -136,7 +136,7 @@
         // --- Generacion aleatoria con niveles y bipartita completa entre niveles adyacentes ---
         function generarAleatorio() {
             N = parseInt(document.getElementById('n-random').value);
-            if (isNaN(N) || N < 8 || N > 16) { log("Error: N debe estar entre [8, 16]", 'error'); return; }
+            if (isNaN(N) || N < 8 || N > 16) { log("Error: El numero de nodos debe estar entre [8, 16]", 'error'); return; }
 
             grafo = Array.from({length: N}, () => ({}));
 
@@ -224,7 +224,7 @@
         // --- Generacion manual con validacion estricta ---
         function generarManual() {
             N = parseInt(document.getElementById('n-manual').value);
-            if (isNaN(N) || N < 8 || N > 16) { log("Error: N debe estar entre [8, 16]", 'error'); return; }
+            if (isNaN(N) || N < 8 || N > 16) { log("Error: El numero de nodos debe estar entre [8, 16]", 'error'); return; }
             grafo = Array.from({length: N}, () => ({}));
             try {
                 const raw = document.getElementById('manual-edges').value.trim();
@@ -459,4 +459,5 @@
     </script>
 </body>
 </html>
+
 

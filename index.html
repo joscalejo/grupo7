@@ -249,7 +249,7 @@
                     let outDeg = Object.keys(grafo[u] || {}).length;
                     let inDeg = 0;
                     for (let i = 0; i < N; i++) if (grafo[i] && grafo[i][u]) inDeg++;
-                    if (inDeg + outDeg === 0) errores.push(`Nodo ${u} está aislado (grado 0).`);
+                    if (inDeg + outDeg === 0) errores.push(`Nodo ${u} está aislado.`);
                 }
 
                 // revisa intermedios
@@ -257,8 +257,8 @@
                     let outDeg = Object.keys(grafo[u] || {}).length;
                     let inDeg = 0;
                     for (let i = 0; i < N; i++) if (grafo[i] && grafo[i][u]) inDeg++;
-                    if (inDeg < 1) errores.push(`Nodo ${u} no tiene aristas entrantes (inDegree = 0).`);
-                    if (outDeg < 1) errores.push(`Nodo ${u} no tiene aristas salientes (outDegree = 0).`);
+                    if (inDeg < 1) errores.push(`Nodo ${u} no tiene aristas entrantes.`);
+                    if (outDeg < 1) errores.push(`Nodo ${u} no tiene aristas salientes.`);
                 }
 
                 // check path 0 -> N-1 (BFS)
@@ -274,7 +274,7 @@
                     return seen;
                 };
                 const reach0 = reach(0);
-                if (!reach0.has(N - 1)) errores.push(`No existe camino dirigido desde la fuente (0) hasta el sumidero (${N - 1}).`);
+                if (!reach0.has(N - 1)) errores.push(`No existe camino dirigido desde la fuente (Nodo 0) hasta el sumidero (Nodo ${N - 1}).`);
 
                 if (errores.length > 0) {
                     log(`<strong>Validación fallida:</strong><br>${errores.join('<br>')}`, 'error');
@@ -459,5 +459,6 @@
     </script>
 </body>
 </html>
+
 
 
